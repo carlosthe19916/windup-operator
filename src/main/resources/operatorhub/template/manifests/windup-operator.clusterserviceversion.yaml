@@ -10,7 +10,7 @@ metadata:
     certified: "false"
     support: https://issues.redhat.com/projects/WINDUP
     repository: https://github.com/windup/windup-operator/
-    containerImage: quay.io/windupeng/windup-operator-native:${RELEASE_VERSION}
+    containerImage: quay.io/carlosthe19916/windup-operator-native:${RELEASE_VERSION}
     imagePullPolicy: Always
     createdAt: ${CREATED_AT}
     alm-examples: |-
@@ -29,8 +29,8 @@ metadata:
            "hostname_http": "",
            "volumeCapacity": "20G",
            "windup_Volume_Capacity": "20G",
-           "web_console_image": "quay.io/windupeng/windup-web-openshift:${RELEASE_VERSION}",
-           "executor_image": "quay.io/windupeng/windup-web-openshift-messaging-executor:${RELEASE_VERSION}",
+           "web_console_image": "quay.io/carlosthe19916/windup-web-openshift:${RELEASE_VERSION}",
+           "executor_image": "quay.io/carlosthe19916/windup-web-openshift-messaging-executor:${RELEASE_VERSION}",
            "messaging_serializer": "http.post.serializer",
            "db_jndi": "java:jboss/datasources/WindupServicesDS",
            "db_username": "",
@@ -137,7 +137,7 @@ spec:
                 serviceAccountName: windup-operator
                 containers:
                   - name: windup-operator
-                    image: quay.io/windupeng/windup-operator-native:${RELEASE_VERSION}
+                    image: quay.io/carlosthe19916/windup-operator-native:${RELEASE_VERSION}
                     imagePullPolicy: Always
                     env:
                       - name: WATCH_NAMESPACE
