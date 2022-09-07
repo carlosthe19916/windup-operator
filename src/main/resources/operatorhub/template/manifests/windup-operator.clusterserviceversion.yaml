@@ -10,7 +10,7 @@ metadata:
     certified: "false"
     support: https://issues.redhat.com/projects/WINDUP
     repository: https://github.com/windup/windup-operator/
-    containerImage: quay.io/carlosthe19916/windup-operator-native:${RELEASE_VERSION}
+    containerImage: quay.io/windupeng/windup-operator-native:${RELEASE_VERSION}
     imagePullPolicy: Always
     createdAt: ${CREATED_AT}
     alm-examples: |-
@@ -29,8 +29,8 @@ metadata:
            "hostname_http": "",
            "volumeCapacity": "20G",
            "windup_Volume_Capacity": "20G",
-           "web_console_image": "quay.io/carlosthe19916/windup-web-openshift:${RELEASE_VERSION}",
-           "executor_image": "quay.io/carlosthe19916/windup-web-openshift-messaging-executor:${RELEASE_VERSION}",
+           "web_console_image": "quay.io/windupeng/windup-web-openshift:${RELEASE_VERSION}",
+           "executor_image": "quay.io/windupeng/windup-web-openshift-messaging-executor:${RELEASE_VERSION}",
            "messaging_serializer": "http.post.serializer",
            "db_jndi": "java:jboss/datasources/WindupServicesDS",
            "db_username": "",
@@ -48,9 +48,10 @@ metadata:
            "jgroups_cluster_password": "",
            "auto_deploy_exploded": "false",
            "sso_server_url": "",
-           "sso_realm": "mta",
+           "sso_realm": "",
            "sso_client_id": "",
            "sso_ssl_required": "EXTERNAL",
+           "sso_bearer_only": "",
            "sso_saml_keystore_secret": "wildfly-app-secret",
            "sso_saml_keystore": "keystore.jks",
            "sso_saml_certificate_name": "jboss",
@@ -105,7 +106,19 @@ spec:
         version: v1
         kind: Windup
         displayName: Windup
-        description: Windup
+        description: >
+          Create a Windup Web Console application.  
+
+
+          To access the Windup Web Console application from the "Developer" perspective, please go to Topology and click on the "Open URL" icon on the web-console pod.  
+
+
+          Alternatively from the "Administrator" perspective, please go to Networking->Routes and click on the Location hyperlink.  
+
+
+          Known issue  
+
+          If you want to customize the Windup Web Console instance's parameters and you can not see any in the `Form view`, please switch to the `YAML view` and change them as needed.
   description: >
     Windup is a web console application that supports large-scale Java application modernization and migration projects across a broad range of transformations and use cases.
     
@@ -113,7 +126,7 @@ spec:
     It analyzes application code, supports effort estimation, accelerates code migration, and enables users to move applications to containers.
     
     
-    For more information please refer to the [https://windup.github.io/) page.
+    For more information please refer to the [https://windup.github.io/](https://windup.github.io/) page.
 
   displayName: Windup Operator
   icon:
@@ -137,7 +150,7 @@ spec:
                 serviceAccountName: windup-operator
                 containers:
                   - name: windup-operator
-                    image: quay.io/carlosthe19916/windup-operator-native:${RELEASE_VERSION}
+                    image: quay.io/windupeng/windup-operator-native:${RELEASE_VERSION}
                     imagePullPolicy: Always
                     env:
                       - name: WATCH_NAMESPACE
@@ -255,6 +268,3 @@ spec:
     - name: GitHub
       url: https://github.com/windup/windup-operator
   version: ${RELEASE_VERSION}
-
-
-
