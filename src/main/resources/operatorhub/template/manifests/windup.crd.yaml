@@ -42,10 +42,10 @@ spec:
                   properties:
                     web:
                       type: string
-                      default: "quay.io/windupeng/windup-web-openshift:${RELEASE_VERSION}"
+                      default: "quay.io/windupeng/windup-web-openshift:latest"
                     executor:
                       type: string
-                      default: "quay.io/windupeng/windup-web-openshift-messaging-executor:${RELEASE_VERSION}"
+                      default: "quay.io/windupeng/windup-web-openshift-messaging-executor:latest"
                     database:
                       type: string
                       default: "registry.access.redhat.com/rhscl/postgresql-10-rhel7:1"
@@ -127,11 +127,6 @@ spec:
                     mem_limit:
                       type: string
                       default: "2Gi"
-#                  required:
-#                    - cpu_request
-#                    - mem_request
-#                    - cpu_limit
-#                    - mem_limit
               required:
                 - volume_capacity
                 - executor_desired_replicas
@@ -165,5 +160,3 @@ spec:
           required:
             - spec
             - apiVersion
-
-

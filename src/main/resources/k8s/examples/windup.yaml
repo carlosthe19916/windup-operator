@@ -6,43 +6,19 @@ metadata:
   labels:
     application: windup
 spec:
-  messaging_serializer: http.post.serializer
-  max_post_size: "4294967296"
+  hostname: "hello.com"
+  volume_capacity: "5Gi"
   executor_desired_replicas: 1
-  # SSO
-#  sso_server_url: http://localhost:8180/auth
-#  sso_realm: windup
-#  sso_client_id: windup-web
-#  sso_ssl_required: EXTERNAL
-  sso_force_legacy_security: "false"
-  # Database
-  db_database: windupdb
-  db_password: pas345678
-  db_username: userXYZ
-  # Volumes
-  windup_Volume_Capacity: 5G
-  volumeCapacity: 5G
-  # Readiness and Liveness
-  webLivenessInitialDelaySeconds: "240"
-  webReadinessInitialDelaySeconds: "240"
-  webLivenessTimeoutSeconds: "100"
-  webReadinessTimeoutSeconds: "100"
-  webReadinessFailureThreshold: "20"
-  webLivenessFailureThreshold: "20"
-  # Resource limits
-  web_cpu_request: "0.5"
-  web_mem_request: 0.5Gi
-  web_cpu_limit: "4"
-  web_mem_limit: 4Gi
-  executor_cpu_request: "0.5"
-  executor_mem_request: 0.5Gi
-  executor_cpu_limit: "4"
-  executor_mem_limit: 4Gi
-  postgresql_cpu_request: "0.5"
-  postgresql_mem_request: "0.5Gi"
-  postgresql_cpu_limit: "2"
-  postgresql_mem_limit: "2Gi"
-  # Container images
-  web_console_image: quay.io/windupeng/windup-web-openshift:latest
-  executor_image: quay.io/windupeng/windup-web-openshift-messaging-executor:latest
-  postgresql_image: registry.access.redhat.com/rhscl/postgresql-10-rhel7:1
+  images:
+    web: quay.io/windupeng/windup-web-openshift:latest
+    executor: quay.io/windupeng/windup-web-openshift-messaging-executor:latest
+  db: {}
+  sso: {}
+  #  server_url: http://localhost:8180/auth
+  #  realm: windup
+  #  client_id: windup-web
+  #  ssl_required: EXTERNAL
+  web_resource_limits: {}
+  executor_resource_limits: {}
+  database_resource_limits: {}
+

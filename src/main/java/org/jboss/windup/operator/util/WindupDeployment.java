@@ -45,6 +45,12 @@ public class WindupDeployment {
   public static final String WINDUP_OPERATOR = "windup-operator";
   public static final String CREATED_BY = "created-by";
 
+  public static final String WEB_READINESS_PROBE = "/bin/bash, -c, ${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands='/core-service=management:read-boot-errors()' | grep '\\\"result\\\" => \\\\[]' && ${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands='ls deployment' | grep 'api.war'";
+  public static final String WEB_LIVENESS_PROBE = "/bin/bash, -c, ${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands='/core-service=management:read-boot-errors()' | grep '\"result\" => \\[]' && ${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands=ls | grep 'server-state=running'";
+
+  public static final String EXECUTOR_READINESS_PROBE = "/bin/bash, -c, /opt/windup-cli/bin/livenessProbe.sh";
+  public static final String EXECUTOR_LIVENESS_PROBE = "/bin/bash, -c, /opt/windup-cli/bin/livenessProbe.sh";
+
   MixedOperation<WindupResource, WindupResourceList, Resource<WindupResource>> crClient;
 
   KubernetesClient k8sClient;
@@ -101,11 +107,11 @@ public class WindupDeployment {
     deployment_amq = application_name + "-amq";
 
     // Calculate values if they come blank
-    mq_cluster_password =  StringUtils.defaultIfBlank(windupResource.getSpec().getMq_cluster_password(),RandomStringUtils.randomAlphanumeric(8));
-    db_username =  StringUtils.defaultIfBlank(windupResource.getSpec().getDb_username(),"user" + RandomStringUtils.randomAlphanumeric(3));
-    db_password =  StringUtils.defaultIfBlank(windupResource.getSpec().getDb_password(),RandomStringUtils.randomAlphanumeric(8));
-    sso_secret = StringUtils.defaultIfBlank(windupResource.getSpec().getSso_secret(),RandomStringUtils.randomAlphanumeric(8));
-    jgroups_cluster_password  = StringUtils.defaultIfBlank(windupResource.getSpec().getJgroups_cluster_password(),RandomStringUtils.randomAlphanumeric(8));
+    mq_cluster_password =  RandomStringUtils.randomAlphanumeric(8);
+    db_username =  StringUtils.defaultIfBlank(windupResource.getSpec().getDb().getUsername(),"user" + RandomStringUtils.randomAlphanumeric(3));
+    db_password =  StringUtils.defaultIfBlank(windupResource.getSpec().getDb().getPassword(),RandomStringUtils.randomAlphanumeric(8));
+    sso_secret = RandomStringUtils.randomAlphanumeric(8);
+    jgroups_cluster_password  = RandomStringUtils.randomAlphanumeric(8);
     executor_desired_replicas = ObjectUtils.defaultIfNull(windupResource.getSpec().getExecutor_desired_replicas(), 1);
   }
 
@@ -234,7 +240,7 @@ public class WindupDeployment {
 
   private List<Ingress> createIngresses() {
     List<Ingress> ingresses = new ArrayList<>();
-    String hostnameHttp = windupResource.getSpec().getHostname_http();
+    String hostnameHttp = windupResource.getSpec().getHostname();
 
     // if the user doesn't provide hostname we'll try to discover it on Openshift
     // if we are in K8s then cluster domain will be blank
@@ -320,7 +326,7 @@ public class WindupDeployment {
         .withNewSpec()
           .withAccessModes("ReadWriteOnce")
           .withNewResources()
-            .addToRequests("storage", new Quantity(windupResource.getSpec().getVolumeCapacity()))
+            .addToRequests("storage", new Quantity(windupResource.getSpec().getVolume_capacity()))
           .endResources()
         .endSpec().build();
     log.info("Created PVC for postgre");
@@ -334,7 +340,7 @@ public class WindupDeployment {
         .withNewSpec()
           .withAccessModes("ReadWriteOnce")
           .withNewResources()
-            .addToRequests("storage", new Quantity(windupResource.getSpec().getWindup_Volume_Capacity()))
+            .addToRequests("storage", new Quantity(windupResource.getSpec().getVolume_capacity()))
           .endResources()
         .endSpec().build();
     log.info("Created PVC for windup");
@@ -379,13 +385,13 @@ public class WindupDeployment {
           .withServiceAccount(serviceAccount).withTerminationGracePeriodSeconds(75L)
           .addNewContainer()
             .withName(application_name)
-            .withImage(windupResource.getSpec().getWeb_console_image())
+            .withImage(windupResource.getSpec().getImages().getWeb())
             .withNewImagePullPolicy("Always")
             .withNewResources()
-              .addToRequests(Map.of("cpu", new Quantity(windupResource.getSpec().getWeb_cpu_request())))
-              .addToRequests(Map.of("memory", new Quantity(windupResource.getSpec().getWeb_mem_request())))
-              .addToLimits(Map.of("cpu", new Quantity(windupResource.getSpec().getWeb_cpu_limit())))
-              .addToLimits(Map.of("memory", new Quantity(windupResource.getSpec().getWeb_mem_limit())))
+              .addToRequests(Map.of("cpu", new Quantity(windupResource.getSpec().getWeb_resource_limits().getCpu_request())))
+              .addToRequests(Map.of("memory", new Quantity(windupResource.getSpec().getWeb_resource_limits().getMem_request())))
+              .addToLimits(Map.of("cpu", new Quantity(windupResource.getSpec().getWeb_resource_limits().getCpu_limit())))
+              .addToLimits(Map.of("memory", new Quantity(windupResource.getSpec().getWeb_resource_limits().getMem_limit())))
             .endResources()
             .addToVolumeMounts(new VolumeMountBuilder()
                                 .withName(volume_windup_web)
@@ -406,71 +412,71 @@ public class WindupDeployment {
             .endLifecycle()
             .withNewLivenessProbe()
               .withNewExec()
-                .withCommand(Arrays.stream(windupResource.getSpec().getWeb_liveness_probe().split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands=ls | grep 'server-state=running'")
+                .withCommand(Arrays.stream(WEB_LIVENESS_PROBE.split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands=ls | grep 'server-state=running'")
               .endExec()
-              .withInitialDelaySeconds(Integer.parseInt(windupResource.getSpec().getWebLivenessInitialDelaySeconds()))
-              .withFailureThreshold(Integer.parseInt(windupResource.getSpec().getWebLivenessFailureThreshold()))
+              .withInitialDelaySeconds(120)
+              .withFailureThreshold(3)
               .withSuccessThreshold(1)
-              .withTimeoutSeconds(Integer.parseInt(windupResource.getSpec().getWebLivenessTimeoutSeconds()))
+              .withTimeoutSeconds(10)
             .endLivenessProbe()
             .withNewReadinessProbe()
               .withNewExec()
-                .withCommand(Arrays.stream(windupResource.getSpec().getWeb_readiness_probe().split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands='ls deployment' | grep 'api.war'")
+                .withCommand(Arrays.stream(WEB_READINESS_PROBE.split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "${JBOSS_HOME}/bin/jboss-cli.sh --connect --commands='ls deployment' | grep 'api.war'")
               .endExec()
-              .withInitialDelaySeconds(Integer.parseInt(windupResource.getSpec().getWebReadinessInitialDelaySeconds()))
-              .withFailureThreshold(Integer.parseInt(windupResource.getSpec().getWebReadinessFailureThreshold()))
+              .withInitialDelaySeconds(120)
+              .withFailureThreshold(3)
               .withSuccessThreshold(1)
-              .withTimeoutSeconds(Integer.parseInt(windupResource.getSpec().getWebReadinessTimeoutSeconds()))
+              .withTimeoutSeconds(10)
             .endReadinessProbe()
             .addNewPort().withName("jolokia").withContainerPort(8778).withProtocol("TCP").endPort()
             .addNewPort().withName("http").withContainerPort(8080).withProtocol("TCP").endPort()
             .addNewPort().withName("ping").withContainerPort(8888).withProtocol("TCP").endPort()
             .addNewEnv().withName("IS_MASTER").withValue("true").endEnv()
-            .addNewEnv().withName("MESSAGING_SERIALIZER").withValue(windupResource.getSpec().getMessaging_serializer()).endEnv()
+            .addNewEnv().withName("MESSAGING_SERIALIZER").withValue("http.post.serializer").endEnv()
             .addNewEnv().withName("DB_SERVICE_PREFIX_MAPPING").withValue(application_name + "-postgresql=DB").endEnv()
-            .addNewEnv().withName("DB_JNDI").withValue(windupResource.getSpec().getDb_jndi()).endEnv()
+            .addNewEnv().withName("DB_JNDI").withValue("java:jboss/datasources/WindupServicesDS").endEnv()
             .addNewEnv().withName("DB_USERNAME").withValue(db_username).endEnv()
             .addNewEnv().withName("DB_PASSWORD").withValue(db_password).endEnv()
-            .addNewEnv().withName("DB_DATABASE").withValue(windupResource.getSpec().getDb_database()).endEnv()
+            .addNewEnv().withName("DB_DATABASE").withValue(windupResource.getSpec().getDb().getDatabase()).endEnv()
             .addNewEnv().withName("TX_DATABASE_PREFIX_MAPPING").withValue(application_name + "-postgresql=DB").endEnv()
-            .addNewEnv().withName("DB_MIN_POOL_SIZE").withValue(windupResource.getSpec().getDb_min_pool_size()).endEnv()
-            .addNewEnv().withName("DB_MAX_POOL_SIZE").withValue(windupResource.getSpec().getDb_max_pool_size()).endEnv()
-            .addNewEnv().withName("DB_TX_ISOLATION").withValue(windupResource.getSpec().getDb_tx_isolation()).endEnv()
+            .addNewEnv().withName("DB_MIN_POOL_SIZE").withValue("").endEnv()
+            .addNewEnv().withName("DB_MAX_POOL_SIZE").withValue("").endEnv()
+            .addNewEnv().withName("DB_TX_ISOLATION").withValue("").endEnv()
             .addNewEnv().withName("OPENSHIFT_KUBE_PING_LABELS").withValue("application=" + application_name).endEnv()
             .addNewEnv().withName("OPENSHIFT_KUBE_PING_NAMESPACE").withValue(namespace).endEnv()
             .addNewEnv().withName("HTTPS_KEYSTORE_DIR").withValue("/etc/wildfly-secret-volume").endEnv()
             .addNewEnv().withName("MQ_CLUSTER_PASSWORD").withValue(mq_cluster_password).endEnv()
-            .addNewEnv().withName("MQ_QUEUES").withValue(windupResource.getSpec().getMq_queues()).endEnv()
-            .addNewEnv().withName("MQ_TOPICS").withValue(windupResource.getSpec().getMq_topics()).endEnv()
-            .addNewEnv().withName("JGROUPS_ENCRYPT_SECRET").withValue(windupResource.getSpec().getJgroups_encrypt_secret()).endEnv()
+            .addNewEnv().withName("MQ_QUEUES").withValue("").endEnv()
+            .addNewEnv().withName("MQ_TOPICS").withValue("").endEnv()
+            .addNewEnv().withName("JGROUPS_ENCRYPT_SECRET").withValue("wildfly-app-secret").endEnv()
             .addNewEnv().withName("JGROUPS_ENCRYPT_KEYSTORE_DIR").withValue("/etc/jgroups-encrypt-secret-volume").endEnv()
-            .addNewEnv().withName("JGROUPS_ENCRYPT_KEYSTORE").withValue(windupResource.getSpec().getJgroups_encrypt_keystore()).endEnv()
-            .addNewEnv().withName("JGROUPS_ENCRYPT_NAME").withValue(windupResource.getSpec().getJgroups_encrypt_name()).endEnv()
-            .addNewEnv().withName("JGROUPS_ENCRYPT_PASSWORD").withValue(windupResource.getSpec().getJgroups_encrypt_password()).endEnv()
+            .addNewEnv().withName("JGROUPS_ENCRYPT_KEYSTORE").withValue("jgroups.jceks").endEnv()
+            .addNewEnv().withName("JGROUPS_ENCRYPT_NAME").withValue("").endEnv()
+            .addNewEnv().withName("JGROUPS_ENCRYPT_PASSWORD").withValue("").endEnv()
             .addNewEnv().withName("JGROUPS_CLUSTER_PASSWORD").withValue(jgroups_cluster_password).endEnv()
-            .addNewEnv().withName("AUTO_DEPLOY_EXPLODED").withValue(windupResource.getSpec().getAuto_deploy_exploded()).endEnv()
+            .addNewEnv().withName("AUTO_DEPLOY_EXPLODED").withValue("false").endEnv()
             .addNewEnv().withName("DEFAULT_JOB_REPOSITORY").withValue(deployment_postgre).endEnv()
             .addNewEnv().withName("TIMER_SERVICE_DATA_STORE").withValue(deployment_postgre).endEnv()
-            .addNewEnv().withName("SSO_AUTH_SERVER_URL").withValue(windupResource.getSpec().getSso_server_url()).endEnv()
-            .addNewEnv().withName("SSO_REALM").withValue(windupResource.getSpec().getSso_realm()).endEnv()
-            .addNewEnv().withName("SSO_CLIENT_ID").withValue(windupResource.getSpec().getSso_client_id()).endEnv()
-            .addNewEnv().withName("SSO_SSL_REQUIRED").withValue(windupResource.getSpec().getSso_ssl_required()).endEnv()
-            .addNewEnv().withName("SSO_BEARER_ONLY").withValue(windupResource.getSpec().getSso_bearer_only()).endEnv()
-            .addNewEnv().withName("SSO_SAML_KEYSTORE_SECRET").withValue(windupResource.getSpec().getSso_saml_keystore_secret()).endEnv()
-            .addNewEnv().withName("SSO_SAML_KEYSTORE").withValue(windupResource.getSpec().getSso_saml_keystore()).endEnv()
+            .addNewEnv().withName("SSO_AUTH_SERVER_URL").withValue(windupResource.getSpec().getSso().getServer_url()).endEnv()
+            .addNewEnv().withName("SSO_REALM").withValue(windupResource.getSpec().getSso().getRealm()).endEnv()
+            .addNewEnv().withName("SSO_CLIENT_ID").withValue(windupResource.getSpec().getSso().getClient_id()).endEnv()
+            .addNewEnv().withName("SSO_SSL_REQUIRED").withValue(windupResource.getSpec().getSso().getSsl_required()).endEnv()
+            .addNewEnv().withName("SSO_BEARER_ONLY").withValue("").endEnv()
+            .addNewEnv().withName("SSO_SAML_KEYSTORE_SECRET").withValue("wildfly-app-secret").endEnv()
+            .addNewEnv().withName("SSO_SAML_KEYSTORE").withValue("keystore.jks").endEnv()
             .addNewEnv().withName("SSO_SAML_KEYSTORE_DIR").withValue("/etc/sso-saml-secret-volume").endEnv()
-            .addNewEnv().withName("SSO_SAML_CERTIFICATE_NAME").withValue(windupResource.getSpec().getSso_saml_certificate_name()).endEnv()
-            .addNewEnv().withName("SSO_SAML_KEYSTORE_PASSWORD").withValue(windupResource.getSpec().getSso_saml_keystore_password()).endEnv()
+            .addNewEnv().withName("SSO_SAML_CERTIFICATE_NAME").withValue("jboss").endEnv()
+            .addNewEnv().withName("SSO_SAML_KEYSTORE_PASSWORD").withValue("mykeystorepass").endEnv()
             .addNewEnv().withName("SSO_SECRET").withValue(sso_secret).endEnv()
-            .addNewEnv().withName("SSO_ENABLE_CORS").withValue(windupResource.getSpec().getSso_enable_cors()).endEnv()
-            .addNewEnv().withName("SSO_SAML_logOUT_PAGE").withValue(windupResource.getSpec().getSso_saml_logout_page()).endEnv()
-            .addNewEnv().withName("SSO_DISABLE_SSL_CERTIFICATE_VALIDATION").withValue(windupResource.getSpec().getSso_disable_ssl_certificate_validation()).endEnv()
-            .addNewEnv().withName("SSO_TRUSTSTORE").withValue(windupResource.getSpec().getSso_truststore()).endEnv()
+            .addNewEnv().withName("SSO_ENABLE_CORS").withValue("false").endEnv()
+            .addNewEnv().withName("SSO_SAML_LOGOUT_PAGE").withValue("/").endEnv()
+            .addNewEnv().withName("SSO_DISABLE_SSL_CERTIFICATE_VALIDATION").withValue("true").endEnv()
+            .addNewEnv().withName("SSO_TRUSTSTORE").withValue("").endEnv()
             .addNewEnv().withName("SSO_TRUSTSTORE_DIR").withValue("/etc/sso-secret-volume").endEnv()
-            .addNewEnv().withName("SSO_TRUSTSTORE_PASSWORD").withValue(windupResource.getSpec().getSso_truststore_password()).endEnv()
-            .addNewEnv().withName("GC_MAX_METASPACE_SIZE").withValue(windupResource.getSpec().getGc_max_metaspace_size()).endEnv()
-            .addNewEnv().withName("MAX_POST_SIZE").withValue(windupResource.getSpec().getMax_post_size()).endEnv()
-            .addNewEnv().withName("SSO_FORCE_LEGACY_SECURITY").withValue(windupResource.getSpec().getSso_force_legacy_security()).endEnv()
+            .addNewEnv().withName("SSO_TRUSTSTORE_PASSWORD").withValue("").endEnv()
+            .addNewEnv().withName("GC_MAX_METASPACE_SIZE").withValue("512").endEnv()
+            .addNewEnv().withName("MAX_POST_SIZE").withValue("4294967296").endEnv()
+            .addNewEnv().withName("SSO_FORCE_LEGACY_SECURITY").withValue("false").endEnv()
           .endContainer()
           .addNewVolume()
             .withName(volume_windup_web)
@@ -522,13 +528,13 @@ public class WindupDeployment {
                   .endPersistentVolumeClaim().build())
               .addNewContainer()
                 .withName(deployment_postgre)
-                .withImage(windupResource.getSpec().getPostgresql_image())
+                .withImage(windupResource.getSpec().getImages().getDatabase())
                 .withNewImagePullPolicy("Always")
                 .withNewResources()
-                  .addToRequests(Map.of("cpu", new Quantity(windupResource.getSpec().getPostgresql_cpu_request())))
-                  .addToRequests(Map.of("memory", new Quantity(windupResource.getSpec().getPostgresql_mem_request())))
-                  .addToLimits(Map.of("cpu", new Quantity(windupResource.getSpec().getPostgresql_cpu_limit())))
-                  .addToLimits(Map.of("memory", new Quantity(windupResource.getSpec().getPostgresql_mem_limit())))
+                  .addToRequests(Map.of("cpu", new Quantity(windupResource.getSpec().getDatabase_resource_limits().getCpu_request())))
+                  .addToRequests(Map.of("memory", new Quantity(windupResource.getSpec().getDatabase_resource_limits().getMem_request())))
+                  .addToLimits(Map.of("cpu", new Quantity(windupResource.getSpec().getDatabase_resource_limits().getCpu_limit())))
+                  .addToLimits(Map.of("memory", new Quantity(windupResource.getSpec().getDatabase_resource_limits().getMem_limit())))
                 .endResources()
                 .addToVolumeMounts(new VolumeMountBuilder()
                     .withName(volume_postgresql)
@@ -536,10 +542,10 @@ public class WindupDeployment {
                     .withReadOnly(false).build())
                 .addNewEnv().withName("POSTGRESQL_USER").withValue(db_username).endEnv()
                 .addNewEnv().withName("POSTGRESQL_PASSWORD").withValue(db_password).endEnv()
-                .addNewEnv().withName("POSTGRESQL_DATABASE").withValue(windupResource.getSpec().getDb_database()).endEnv()
-                .addNewEnv().withName("POSTGRESQL_MAX_CONNECTIONS").withValue(windupResource.getSpec().getPostgresql_max_connections()).endEnv()
-                .addNewEnv().withName("POSTGRESQL_MAX_PREPARED_TRANSACTIONS").withValue(windupResource.getSpec().getPostgresql_max_connections()).endEnv()
-                .addNewEnv().withName("POSTGRESQL_SHARED_BUFFERS").withValue(windupResource.getSpec().getPostgresql_shared_buffers()).endEnv()
+                .addNewEnv().withName("POSTGRESQL_DATABASE").withValue(windupResource.getSpec().getDb().getDatabase()).endEnv()
+                .addNewEnv().withName("POSTGRESQL_MAX_CONNECTIONS").withValue("200").endEnv()
+                .addNewEnv().withName("POSTGRESQL_MAX_PREPARED_TRANSACTIONS").withValue("200").endEnv()
+                .addNewEnv().withName("POSTGRESQL_SHARED_BUFFERS").withValue("").endEnv()
               .endContainer()
             .endSpec()
           .endTemplate()
@@ -574,13 +580,13 @@ public class WindupDeployment {
               .withTerminationGracePeriodSeconds(75L)
               .addNewContainer()
                 .withName(deployment_executor)
-                .withImage(windupResource.getSpec().getExecutor_image())
+                .withImage(windupResource.getSpec().getImages().getExecutor())
                 .withNewImagePullPolicy("Always")
                 .withNewResources()
-                  .addToRequests(Map.of("cpu", new Quantity(windupResource.getSpec().getExecutor_cpu_request())))
-                  .addToRequests(Map.of("memory", new Quantity(windupResource.getSpec().getExecutor_mem_request())))
-                  .addToLimits(Map.of("cpu", new Quantity(windupResource.getSpec().getExecutor_cpu_limit())))
-                  .addToLimits(Map.of("memory", new Quantity(windupResource.getSpec().getExecutor_mem_limit())))
+                  .addToRequests(Map.of("cpu", new Quantity(windupResource.getSpec().getExecutor_resource_limits().getCpu_request())))
+                  .addToRequests(Map.of("memory", new Quantity(windupResource.getSpec().getExecutor_resource_limits().getMem_request())))
+                  .addToLimits(Map.of("cpu", new Quantity(windupResource.getSpec().getExecutor_resource_limits().getCpu_limit())))
+                  .addToLimits(Map.of("memory", new Quantity(windupResource.getSpec().getExecutor_resource_limits().getMem_limit())))
                 .endResources()
                 .addToVolumeMounts(new VolumeMountBuilder()
                   .withName(application_name + "-windup-web-executor-volume")
@@ -595,7 +601,7 @@ public class WindupDeployment {
                 .endLifecycle()
                 .withNewLivenessProbe()
                   .withNewExec()
-                    .withCommand(Arrays.stream(windupResource.getSpec().getExecutor_liveness_probe().split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "/opt/windup-cli/bin/livenessProbe.sh")
+                    .withCommand(Arrays.stream(EXECUTOR_LIVENESS_PROBE.split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "/opt/windup-cli/bin/livenessProbe.sh")
                   .endExec()
                   .withInitialDelaySeconds(120)
                   .withFailureThreshold(3)
@@ -604,7 +610,7 @@ public class WindupDeployment {
                 .endLivenessProbe()
                 .withNewReadinessProbe()
                   .withNewExec()
-                    .withCommand(Arrays.stream(windupResource.getSpec().getExecutor_readiness_probe().split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "/opt/windup-cli/bin/livenessProbe.sh")
+                    .withCommand(Arrays.stream(EXECUTOR_READINESS_PROBE.split(",")).map(String::trim).collect(Collectors.toList())) //"/bin/bash", "-c", "/opt/windup-cli/bin/livenessProbe.sh")
                   .endExec()
                   .withInitialDelaySeconds(120)
                   .withFailureThreshold(3)
@@ -612,7 +618,7 @@ public class WindupDeployment {
                   .withTimeoutSeconds(10)
                 .endReadinessProbe()
                 .addNewEnv().withName("IS_MASTER").withValue("false").endEnv()
-                .addNewEnv().withName("MESSAGING_SERIALIZER").withValue(windupResource.getSpec().getMessaging_serializer()).endEnv()
+                .addNewEnv().withName("MESSAGING_SERIALIZER").withValue("http.post.serializer").endEnv()
                 .addNewEnv().withName("MESSAGING_HOST_VAR").withValue(application_name + "_SERVICE_HOST").endEnv()
                 .addNewEnv().withName("MESSAGING_PASSWORD").withValue("gthudfal").endEnv()
                 .addNewEnv().withName("MESSAGING_USER").withValue("jms-user").endEnv()

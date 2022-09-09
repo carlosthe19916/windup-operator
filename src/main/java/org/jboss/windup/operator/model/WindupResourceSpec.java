@@ -3,6 +3,7 @@ package org.jboss.windup.operator.model;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.fabric8.kubernetes.api.model.KubernetesResource;
 import io.quarkus.runtime.annotations.RegisterForReflection;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,73 +16,51 @@ public class WindupResourceSpec implements KubernetesResource {
 
     private String version;
     private String application_name;
-    private String hostname_http;
-    private String volumeCapacity;
-    private String windup_Volume_Capacity;
-    private String web_console_image;
-    private String executor_image;
-    private String messaging_serializer;
-    private String db_jndi;
-    private String db_username;
-    private String db_password;
-    private String db_min_pool_size;
-    private String db_max_pool_size;
-    private String db_tx_isolation;
-    private String mq_cluster_password;
-    private String mq_queues;
-    private String mq_topics;
-    private String jgroups_encrypt_secret;
-    private String jgroups_encrypt_keystore;
-    private String jgroups_encrypt_name;
-    private String jgroups_encrypt_password;
-    private String jgroups_cluster_password;
-    private String auto_deploy_exploded;
-    private String sso_server_url;
-    private String sso_realm;
-    private String sso_client_id;
-    private String sso_ssl_required;
-    private String sso_bearer_only;
-    private String sso_saml_keystore_secret;
-    private String sso_saml_keystore;
-    private String sso_saml_certificate_name;
-    private String sso_saml_keystore_password;
-    private String sso_secret;
-    private String sso_enable_cors;
-    private String sso_saml_logout_page;
-    private String sso_disable_ssl_certificate_validation;
-    private String sso_truststore;
-    private String sso_truststore_password;
-    private String sso_truststore_secret;
-    private String sso_force_legacy_security;
-    private String gc_max_metaspace_size;
-    private String max_post_size;
-    private String db_database;
-    private String postgresql_max_connections;
-    private String postgresql_shared_buffers;
-    private String postgresql_cpu_request;
-    private String postgresql_mem_request;
-    private String postgresql_cpu_limit;
-    private String postgresql_mem_limit;
-    private String postgresql_image;
-    private String webLivenessInitialDelaySeconds;
-    private String webLivenessTimeoutSeconds;
-    private String webLivenessFailureThreshold;
-    private String webReadinessInitialDelaySeconds;
-    private String webReadinessTimeoutSeconds;
-    private String webReadinessFailureThreshold;
-    private String web_cpu_request;
-    private String web_mem_request;
-    private String executor_cpu_request;
-    private String executor_mem_request;
-    private String executor_cpu_limit;
-    private String executor_mem_limit;
-    private String web_cpu_limit;
-    private String web_mem_limit;
-    private String web_readiness_probe;
-    private String web_liveness_probe;
-    private String executor_readiness_probe;
-    private String executor_liveness_probe;
+
+    private String volume_capacity;
     private Integer executor_desired_replicas;
+
+    private String hostname;
     private String tls_secret;
+
+    private Images images;
+    private DB db;
+    private SSO sso;
+
+    private ResourceLimit web_resource_limits;
+    private ResourceLimit executor_resource_limits;
+    private ResourceLimit database_resource_limits;
+
+    @Data
+    public static class Images {
+        private String web;
+        private String executor;
+        private String database;
+    }
+
+
+    @Data
+    public static class SSO {
+        private String server_url;
+        private String realm;
+        private String client_id;
+        private String ssl_required;
+    }
+
+    @Data
+    public static class DB {
+        private String username;
+        private String password;
+        private String database;
+    }
+
+    @Data
+    public static class ResourceLimit {
+        private String cpu_request;
+        private String cpu_limit;
+        private String mem_request;
+        private String mem_limit;
+    }
+
 }
 
